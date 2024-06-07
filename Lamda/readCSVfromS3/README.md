@@ -61,8 +61,7 @@ Ensure the Lambda function's execution role has the following permissions:
     }
   ]
 }
-
-
+```
 
 ### 4. Configure S3 Event Notification
 #### Configure an S3 event notification to trigger the Lambda function whenever a new CSV file is uploaded:
