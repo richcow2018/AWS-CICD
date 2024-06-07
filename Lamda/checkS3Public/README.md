@@ -21,7 +21,7 @@ Consider a scenario where you want to ensure that no security groups have port 2
 Create a Lambda function that will update security group rules to restrict SSH access.
 
 ### Step 2: Create a Custom AWS Config Rule
-## Create a custom AWS Config rule to check for security groups with port 22 open to the public.
+#### Create a custom AWS Config rule to check for security groups with port 22 open to the public.
 
 Config Rule Definition
 1. Open the AWS Config console.
@@ -31,7 +31,7 @@ Config Rule Definition
 5. Select the Lambda function created in Step 1.
 
 ### Step 3: Set Up Permissions
-## Ensure the Lambda function has the necessary permissions to interact with AWS Config and EC2.
+#### Ensure the Lambda function has the necessary permissions to interact with AWS Config and EC2.
 
 IAM Policy for Lambda
 Attach the following IAM policy to the Lambda execution role:
