@@ -1,0 +1,36 @@
+{
+  "family": "my-task-family",
+  "taskRoleArn": "arn:aws:iam::123456789012:role/ECSTaskExecutionRole",
+  "executionRoleArn": "arn:aws:iam::123456789012:role/ECSTaskExecutionRole",
+  "containerDefinitions": [
+    {
+      "name": "my-container",
+      "image": "my-container-image",
+      "essential": true,
+      "environment": [
+        {
+          "name": "DB_USERNAME",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:123456789012:secret:MyDatabaseCredentials-ABC123"
+        },
+        {
+          "name": "DB_PASSWORD",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:123456789012:secret:MyDatabaseCredentials-ABC123"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/my-log-group",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }
+  ],
+  "requiresCompatibilities": [
+    "FARGATE"
+  ],
+  "networkMode": "awsvpc",
+  "cpu": "256",
+  "memory": "512"
+}
