@@ -1,0 +1,266 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFormation template to manage EC2 instance lifecycle using Auto Scaling, lifecycle hooks, and CloudFormation helper scripts.
+
+Parameters:
+  KeyName:
+    Description: Name of an existing EC2 KeyPair to enable SSH access to the instances
+    Type: AWS::EC2::KeyPair::KeyName
+
+Resources:
+  # DynamoDB table to store licenses
+  LicenseTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: LicenseID
+          AttributeType: S
+      KeySchema:
+        - AttributeName: LicenseID
+          KeyType: HASH
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
+
+  # IAM Role for the Lambda functions
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: LambdaDynamoDBPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:UpdateItem
+                  - dynamodb:Scan
+                  - dynamodb:PutItem
+                  - autoscaling:CompleteLifecycleAction
+                  - sns:Publish
+                Resource: "*"
+
+  # Lambda function to initialize the DynamoDB table
+  LicenseTableInitFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: index.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        ZipFile: |
+          import boto3
+
+          def handler(event, context):
+              dynamodb = boto3.resource('dynamodb')
+              table = dynamodb.Table(event['ResourceProperties']['LicenseTable'])
+              
+              for i in range(100):
+                  table.put_item(Item={'LicenseID': str(i)})
+              
+              return {
+                  'StatusCode': 200,
+                  'Body': 'License Table Initialized'
+              }
+      Runtime: python3.8
+      Timeout: 300
+      Environment:
+        Variables:
+          LicenseTable: !Ref LicenseTable
+
+  # Custom resource to initialize the DynamoDB table
+  LicenseTableInitializer:
+    Type: Custom::LicenseTableInitializer
+    Properties:
+      ServiceToken: !GetAtt LicenseTableInitFunction.Arn
+
+  # SNS topics for lifecycle hooks
+  LaunchHookSNS:
+    Type: AWS::SNS::Topic
+
+  TerminateHookSNS:
+    Type: AWS::SNS::Topic
+
+  # Lambda function to handle instance launch
+  LaunchLifecycleHookFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: index.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        ZipFile: |
+          import boto3
+
+          def handler(event, context):
+              dynamodb = boto3.resource('dynamodb')
+              table = dynamodb.Table('LicenseTable')
+              instance_id = event['detail']['EC2InstanceId']
+              
+              response = table.scan(FilterExpression='attribute_not_exists(InUseBy)')
+              if response['Items']:
+                  license_id = response['Items'][0]['LicenseID']
+                  table.update_item(
+                      Key={'LicenseID': license_id},
+                      UpdateExpression="SET InUseBy = :instance_id",
+                      ExpressionAttributeValues={':instance_id': instance_id}
+                  )
+              
+              asg_client = boto3.client('autoscaling')
+              asg_client.complete_lifecycle_action(
+                  LifecycleHookName=event['detail']['LifecycleHookName'],
+                  AutoScalingGroupName=event['detail']['AutoScalingGroupName'],
+                  LifecycleActionResult='CONTINUE',
+                  InstanceId=instance_id
+              )
+
+      Runtime: python3.8
+      Timeout: 60
+
+  # Lambda function to handle instance termination
+  TerminateLifecycleHookFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: index.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        ZipFile: |
+          import boto3
+
+          def handler(event, context):
+              dynamodb = boto3.resource('dynamodb')
+              table = dynamodb.Table('LicenseTable')
+              instance_id = event['detail']['EC2InstanceId']
+              
+              response = table.scan(FilterExpression='InUseBy = :instance_id', ExpressionAttributeValues={':instance_id': instance_id})
+              if response['Items']:
+                  license_id = response['Items'][0]['LicenseID']
+                  table.update_item(
+                      Key={'LicenseID': license_id},
+                      UpdateExpression="REMOVE InUseBy"
+                  )
+              
+              asg_client = boto3.client('autoscaling')
+              asg_client.complete_lifecycle_action(
+                  LifecycleHookName=event['detail']['LifecycleHookName'],
+                  AutoScalingGroupName=event['detail']['AutoScalingGroupName'],
+                  LifecycleActionResult='CONTINUE',
+                  InstanceId=instance_id
+              )
+
+      Runtime: python3.8
+      Timeout: 60
+
+  # IAM Role for the Auto Scaling lifecycle hooks
+  LifecycleHookRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: LifecycleHookPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - autoscaling:CompleteLifecycleAction
+                  - sns:Publish
+                Resource: "*"
+
+  # Auto Scaling group to manage EC2 instances
+  AutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      VPCZoneIdentifier:
+        - subnet-XXXXXXXX  # Replace with your subnet
+      LaunchConfigurationName: !Ref LaunchConfiguration
+      MinSize: 1
+      MaxSize: 10
+      DesiredCapacity: 2
+      LifecycleHookSpecificationList:
+        - LifecycleHookName: LaunchLifecycleHook
+          LifecycleTransition: autoscaling:EC2_INSTANCE_LAUNCHING
+          NotificationTargetARN: !Ref LaunchHookSNS
+          RoleARN: !GetAtt LifecycleHookRole.Arn
+        - LifecycleHookName: TerminateLifecycleHook
+          LifecycleTransition: autoscaling:EC2_INSTANCE_TERMINATING
+          NotificationTargetARN: !Ref TerminateHookSNS
+          RoleARN: !GetAtt LifecycleHookRole.Arn
+
+  # Launch configuration for EC2 instances
+  LaunchConfiguration:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties:
+      ImageId: ami-XXXXXXXX  # Replace with your AMI ID
+      InstanceType: t2.micro
+      KeyName: !Ref KeyName
+      UserData:
+        Fn::Base64: |
+          #!/bin/bash
+          yum update -y
+          yum install -y aws-cfn-bootstrap
+          
+          # Fetch and run cfn-init to install and configure the instance
+          /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource LaunchConfiguration --region ${AWS::Region}
+
+          # Signal completion
+          /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource AutoScalingGroup --region ${AWS::Region}
+
+  # CloudWatch Event rule to trigger LaunchLifecycleHookFunction
+  LaunchLifecycleHookRule:
+    Type: AWS::Events::Rule
+    Properties:
+      EventPattern:
+        source:
+          - aws.autoscaling
+        detail-type:
+          - EC2 Instance-launch Lifecycle Action
+        detail:
+          LifecycleHookName:
+            - LaunchLifecycleHook
+      Targets:
+        - Arn: !GetAtt LaunchLifecycleHookFunction.Arn
+          Id: "LaunchLifecycleHookFunction"
+
+  # CloudWatch Event rule to trigger TerminateLifecycleHookFunction
+  TerminateLifecycleHookRule:
+    Type: AWS::Events::Rule
+    Properties:
+      EventPattern:
+        source:
+          - aws.autoscaling
+        detail-type:
+          - EC2 Instance-terminate Lifecycle Action
+        detail:
+          LifecycleHookName:
+            - TerminateLifecycleHook
+      Targets:
+        - Arn: !GetAtt TerminateLifecycleHookFunction.Arn
+          Id: "TerminateLifecycleHookFunction"
+
+Outputs:
+  LicenseTable:
+    Description: DynamoDB table storing licenses
+    Value: !Ref LicenseTable
+  LaunchHookSNS:
+    Description: SNS Topic for instance launch lifecycle hooks
+    Value: !Ref LaunchHookSNS
+  TerminateHookSNS:
+    Description: SNS Topic for instance termination lifecycle hooks
+    Value: !Ref TerminateHookSNS
+  AutoScalingGroup:
+    Description: Auto Scaling group managing EC2 instances
+    Value: !Ref AutoScalingGroup
+  LaunchConfiguration:
+    Description: Launch Configuration for EC2 instances
+    Value: !Ref LaunchConfiguration
