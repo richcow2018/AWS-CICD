@@ -1,0 +1,43 @@
+Resources:
+  EncryptionFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: index.handler
+      Role: !GetAtt EncryptionFunctionRole.Arn
+      Code:
+        S3Bucket: your-bucket-name
+        S3Key: encryptEBS-lamda.zip
+      Runtime: python3.8
+      Timeout: 300
+
+  EncryptionFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service: "lambda.amazonaws.com"
+            Action: "sts:AssumeRole"
+      Policies:
+        - PolicyName: "LambdaExecutionPolicy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "logs:CreateLogGroup"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                Resource: "arn:aws:logs:*:*:*"
+              - Effect: "Allow"
+                Action:
+                  - "ec2:DescribeInstances"
+                  - "kms:Encrypt"
+                Resource: "*"
+
+  EncryptionTrigger:
+    Type: Custom::EncryptionTrigger
+    Properties:
+      ServiceToken: !GetAtt EncryptionFunction.Arn
