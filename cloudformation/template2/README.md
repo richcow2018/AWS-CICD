@@ -20,7 +20,7 @@ The `S3Key` property in the CloudFormation template refers to the name of the ZI
 
 Ensure to replace placeholders like `your-lambda-zip-file.zip` with the actual key (filename) of the ZIP file containing your Lambda function code.
 
-## In the CloudFormation template, S3Key: your-lambda-zip-file.zip would be replaced with the actual key (filename) of the ZIP file containing your Lambda function code. For example, if your Lambda function code is in a file named lambda_function.py and you zipped it into a file named my-lambda-function.zip, then S3Key would be my-lambda-function.zip.
+### In the CloudFormation template, S3Key: your-lambda-zip-file.zip would be replaced with the actual key (filename) of the ZIP file containing your Lambda function code. For example, if your Lambda function code is in a file named lambda_function.py and you zipped it into a file named my-lambda-function.zip, then S3Key would be my-lambda-function.zip.
 
 ### Here's how it works:
 
