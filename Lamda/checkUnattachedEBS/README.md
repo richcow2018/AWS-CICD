@@ -20,10 +20,12 @@ cd unattached-ebs-volume-manager
    pip install boto3
 3. Open the lambda_function.py file in a text editor and update the AWS region if needed. Modify the code as per your specific requirements.
 4. Deploy the Lambda function using the AWS CLI:
+5. ```bash
    aws lambda create-function --function-name unattached-ebs-volume-manager \
-  --runtime python3.8 --role your-lambda-execution-role \
-  --handler lambda_function.lambda_handler --zip-file fileb://lambda_function.zip
-5. Create an Amazon CloudWatch Events rule to schedule the Lambda function to run daily:
+   --runtime python3.8 --role your-lambda-execution-role \
+   --handler lambda_function.lambda_handler --zip-file fileb://lambda_function.zip
+  
+6. Create an Amazon CloudWatch Events rule to schedule the Lambda function to run daily:
    - Go to the AWS Management Console and navigate to CloudWatch.
    - Click on "Events" in the left navigation pane and then click on "Create rule."
    - Configure the event schedule using a cron expression to specify the daily invocation time.
