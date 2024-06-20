@@ -1,0 +1,21 @@
+{
+  "Comment": "A description of my state machine",
+  "StartAt": "Invoke IAM",
+  "States": {
+    "Invoke IAM": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:region:account-id:function:InvokeIAMFunction",
+      "Next": "Invoke CloudTrail"
+    },
+    "Invoke CloudTrail": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:region:account-id:function:InvokeCloudTrailFunction",
+      "Next": "Invoke SNS"
+    },
+    "Invoke SNS": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:region:account-id:function:InvokeSNSFunction",
+      "End": true
+    }
+  }
+}
