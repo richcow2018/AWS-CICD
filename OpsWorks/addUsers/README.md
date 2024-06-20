@@ -102,6 +102,4 @@ Before proceeding, ensure you have the following set up:
 
 By using AWS OpsWorks with Chef, you can automate the process of creating login information for a new employee on all your EC2 instances in a standardized and efficient manner. This repository provides a clear guide to setting up and using OpsWorks and Chef for user management across your AWS infrastructure.
 
----
 
-You can use this README.md file in your GitHub repository to provide clear instructions and guidance for users on how to set up and utilize the solution effectively. Adjust the instructions and paths as per your specific environment and requirements.
