@@ -1,0 +1,27 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.7
+    commands:
+      - echo Installing dependencies...
+      - pip install -r requirements.txt
+  pre_build:
+    commands:
+      - echo Running tests...
+      - ./run_tests.sh
+  build:
+    commands:
+      - echo Building the Odoo modules...
+      - ./build_odoo_modules.sh
+  post_build:
+    commands:
+      - echo Running security scans...
+      - ./security_scan.sh
+      - echo Preparing artifact...
+      - ./prepare_artifact.sh
+
+artifacts:
+  files:
+    - '**/*'
