@@ -1,4 +1,4 @@
-AWSTemplateFormatVersion: '2010-09-09'
+AWSTemplateFormatVersion: '2023-09-09'
 Description: CloudFormation template to manage EC2 instance lifecycle using Auto Scaling, lifecycle hooks, and CloudFormation helper scripts.
 
 Parameters:
