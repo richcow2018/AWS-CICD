@@ -1,4 +1,4 @@
-AWSTemplateFormatVersion: '2010-09-09'
+AWSTemplateFormatVersion: '2023-09-09'
 Description: CloudFormation template to dynamically allocate software licenses to EC2 instances using an Auto Scaling group, DynamoDB, and Lambda.
 
 Parameters:
